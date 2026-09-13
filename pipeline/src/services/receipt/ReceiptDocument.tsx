@@ -89,6 +89,7 @@ export const ReceiptDocument: React.FC<{ order: Order }> = ({ order }) => {
           <Text style={styles.itemName}>Item</Text>
           <Text style={styles.itemQuantity}>Quantity</Text>
           <Text style={styles.itemPrice}>Price</Text>
+          <Text style={styles.itemPrice}>Total</Text>
         </View>
 
         {/* Items */}
@@ -97,13 +98,14 @@ export const ReceiptDocument: React.FC<{ order: Order }> = ({ order }) => {
             <Text style={styles.itemName}>{item.name}</Text>
             <Text style={styles.itemQuantity}>{item.quantity}</Text>
             <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
+            <Text style={styles.itemPrice}>${(item.price * item.quantity).toFixed(2)}</Text>
           </View>
         ))}
 
         {/* Total Amount */}
         <View style={styles.total}>
           <Text style={styles.totalLabel}>Total Amount:</Text>
-          <Text>${order.amount.toFixed(2)}</Text>
+          <Text>${(order.details?.items ?? []).reduce((acc, item) => acc + item.price * item.quantity, 0).toFixed(2)}</Text>
         </View>
       </Page>
     </Document>

@@ -9,7 +9,7 @@ services:
       - "1080:8025" # web ui
     entrypoint: ["/bin/sh", "-c", "MailHog &>/dev/null"]
 
-  # runs on 9324, 9325 for dashboard
+  # runs on 9324, 9325 for SQS API and debugging
   sqs:
     image: softwaremill/elasticmq
     profiles: ["dev"]
@@ -18,8 +18,8 @@ services:
     container_name: sqs
     volumes:
       - sqs_data:/var/lib/elasticmq
-      - ./elasticmq.conf:/etc/elasticmq/elasticmq.conf
-    command: -Dconfig.file=/etc/elasticmq/elasticmq.conf
+      # Image reads queue definitions from /opt/elasticmq.conf (not /etc/...)
+      - ./elasticmq.conf:/opt/elasticmq.conf
 
   dynamodb:
     command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data"

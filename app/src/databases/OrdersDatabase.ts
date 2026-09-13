@@ -1,8 +1,8 @@
 import {
-  DeleteItemCommand,
   GetItemCommand,
   PutItemCommand,
   ScanCommand,
+  UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import { unmarshall, marshall } from "@aws-sdk/util-dynamodb";
 
@@ -42,12 +42,15 @@ export class OrdersDatabase {
     /* Build filter expression */
     const filterExpression: Array<string> = [];
     const expressionAttributeValues = {};
+    /* map #userId, #status, #referenceId to the real column names */
+    const expressionAttributeNames = {};
 
     const filters = ['userId', 'status', 'referenceId'];
     for (const filter of filters) {
       if (params[filter]) {
         filterExpression.push(`#${filter} = :${filter}`);
         expressionAttributeValues[`:${filter}`] = { S: params[filter] };
+        expressionAttributeNames[`#${filter}`] = filter;
       }
     }
 
@@ -56,6 +59,7 @@ export class OrdersDatabase {
       Limit: count,
       FilterExpression: filterExpression.length > 0 ? filterExpression.join(" AND ") : undefined,
       ExpressionAttributeValues: filterExpression.length > 0 ? expressionAttributeValues : undefined,
+      ExpressionAttributeNames: filterExpression.length > 0 ? expressionAttributeNames : undefined,
       Select: "ALL_ATTRIBUTES"
     });
 
@@ -103,9 +107,15 @@ export class OrdersDatabase {
     const client = DynamoService.getClient();
     if (!DYNAMO_TABLE_ORDERS) throw new Error("DYNAMO_TABLE_ORDERS is not defined");
 
-    const command = new DeleteItemCommand({
+    const command = new UpdateItemCommand({
       TableName: DYNAMO_TABLE_ORDERS,
       Key: { orderId: { S: orderId } },
+      UpdateExpression: "set #status = :status, updatedAt = :updatedAt",
+      ExpressionAttributeNames: { "#status": "status" },
+      ExpressionAttributeValues: {
+        ":status": { S: OrderStatus.CANCELLED },
+        ":updatedAt": { N: `${Date.now()}` },
+      },
     });
 
     await client.send(command);

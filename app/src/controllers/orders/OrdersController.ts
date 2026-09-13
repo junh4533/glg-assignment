@@ -2,11 +2,11 @@ import { Request, Response } from "express";
 
 import { Controller } from "../Controller";
 import { OrdersDatabase } from "../../databases/OrdersDatabase";
-import { getOrderStatus } from "../../definitions/enums/OrderStatus";
+import { getOrderStatus, OrderStatus } from "../../definitions/enums/OrderStatus";
 import { OrderFactory } from "../../definitions/entities/Order";
 import { SimpleQueueService } from "../../services/sqs/SimpleQueueService";
 
-const { SQS_ORDER_INTAKE_QUEUE_NAME } = process.env;
+const { SQS_ORDER_INTAKE_QUEUE_NAME, SQS_ORDER_EMAIL_QUEUE_NAME } = process.env;
 
 /**
  * @swagger
@@ -30,7 +30,7 @@ export class OrdersController extends Controller {
    *          name: userId
    *          required: false
    *          schema:
-   *            type: number
+   *            type: string
    *            description: The user ID to filter orders by.
    *        - in: query
    *          name: status
@@ -204,39 +204,30 @@ export class OrdersController extends Controller {
 
   /**
     * @swagger
-    * /api/orders:
+    * /api/orders/{orderId}:
     *    delete:
     *      tags: [Orders]
-    *      summary: Delete an order.
-    *      requestBody:
-    *        required: true
-    *        content:
-    *          application/json:
-    *            schema:
-    *              type: object
-    *              properties:
-    *                orderId:
-    *                  type: string
-    *                  description: The ID for the order.
+    *      summary: Cancel an order.
+    *      parameters:
+    *        - in: path
+    *          name: orderId
+    *          required: true
+    *          schema:
+    *            type: string
+    *            description: The ID of the order to cancel.
     *      produces:
     *        - application/json
     *      responses:
     *        "200":
     *          description: OK
     *        "404":
-    *          description: BAD REQUEST
-    *        "400":
-    *          description: BAD REQUEST
+    *          description: ORDER NOT FOUND
     *        "500":
     *          description: ERROR
     */
   public async deleteOrder(req: Request, res: Response): Promise<void> {
     try {
-      const { orderId } = req.body;
-      if (!orderId) {
-        res.status(400).json({ success: false, message: "ORDER_ID_REQUIRED" });
-        return;
-      }
+      const { orderId } = req.params;
 
       const order = await OrdersDatabase.getOrderById(orderId);
       if (!order) {
@@ -245,7 +236,8 @@ export class OrdersController extends Controller {
       }
 
       await OrdersDatabase.deleteOrder(orderId);
-      res.status(200).json({ success: true, order });
+      await SimpleQueueService.sendMessage(SQS_ORDER_EMAIL_QUEUE_NAME, "Cancel order", { orderId });
+      res.status(200).json({ success: true, order: { ...order, status: OrderStatus.CANCELLED } });
     }
     catch (error) {
       this.handleError(req, res, error);

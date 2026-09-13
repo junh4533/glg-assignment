@@ -26,6 +26,11 @@ export class OrderEmailerInstance extends QueueInstance<OrderMessage> {
     const order = await OrdersDatabase.getOrderById(orderId);
 
     if (!order) throw new Error(`Order not found: ${orderId}`);
+    if (order.status === OrderStatus.CANCELLED) {
+      await EmailService.sendEmail({ order });
+      this.logger.info(`Order ${orderId} cancellation email sent`);
+      return;
+    }
     if (order.status !== OrderStatus.PROCESSING) {
       this.logger.warn(`Order ${orderId} is not in PROCESSING state`);
       return;
